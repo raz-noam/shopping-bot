@@ -2,15 +2,16 @@ import os
 import json
 import re
 import gspread
+import threading
+from flask import Flask, request
 from oauth2client.service_account import ServiceAccountCredentials
 from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, WebhookHandler
-from flask import Flask, request
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 
-# הגדרת Flask לאירוח ה-Webhook
+# הגדרת Flask
 app = Flask(__name__)
 
-# חיבור לשיטס
+# חיבור ל-Google Sheets
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 creds_dict = json.loads(credentials_json)
@@ -21,7 +22,7 @@ sheet = client.open("רשימת קניות").sheet1
 # טוקן הבוט
 TOKEN = "7059075374:AAH9KdldlwL5V50LRGmkiJs2dB-NFfPfFw8"
 
-# פונקציה לטיפול בהודעות
+# טיפול בהודעות
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     match = re.match(r'(?:(\d+)\s+)?(.+)', text)
@@ -62,10 +63,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sheet.append_row([item, quantity])
         await update.message.reply_text(f"התווסף {quantity} {item} לרשימה.")
 
-# יצירת אפליקציה והגדרת webhook
+# הגדרת אפליקציית טלגרם
 app_telegram = ApplicationBuilder().token(TOKEN).build()
 app_telegram.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
+# הגדרת Webhook
 WEBHOOK_URL = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}"
 
 @app.route(f"/{TOKEN}", methods=["POST"])
@@ -74,9 +76,12 @@ def webhook():
     app_telegram.update_queue.put_nowait(update)
     return "OK"
 
-@app.before_first_request
+# רישום ה-Webhook אחרי עליית השרת
 def set_webhook():
     app_telegram.bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
 
+threading.Thread(target=set_webhook).start()
+
+# הרצת Flask
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
