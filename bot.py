@@ -15,7 +15,7 @@ client = gspread.authorize(creds)
 sheet = client.open("רשימת קניות").sheet1
 
 # טוקן של הבוט מטלגרם
-TOKEN = "7059075374:AAHAmmp4uv-Naiy8qT6G6e7alT74zuhOAFA"
+TOKEN = "7059075374:AAH9KdldlwL5V50LRGmkiJs2dB-NFfPfFw8"
 
 # פונקציה לטיפול בהודעות נכנסות
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
