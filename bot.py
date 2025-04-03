@@ -92,6 +92,9 @@ def format_shopping_list(data):
 
 # Message handler
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("📥 הפונקציה handle_message הופעלה")
+    print(f"✉️ התקבלה הודעה: {update.message.text}")
+
     try:
         user = update.effective_user
         logger.info(f"Message from {user.id} ({user.username}): {update.message.text}")
