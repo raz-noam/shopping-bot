@@ -3,10 +3,15 @@ import json
 import re
 import gspread
 import asyncio
+import logging
 from oauth2client.service_account import ServiceAccountCredentials
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 from flask import Flask, request
+
+# Logging (חדש)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Flask app
 app = Flask(__name__)
@@ -25,46 +30,54 @@ sheet = client.open("רשימת קניות").sheet1
 
 # Handle incoming messages
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("📥 handle_message activated")
-    text = update.message.text.strip()
-    match = re.match(r'(?:(\d+)\s+)?(.+)', text)
-    quantity = int(match.group(1)) if match and match.group(1) else 1
-    item = match.group(2).strip() if match else text
+    try:
+        logger.info("📥 handle_message activated")
+        text = update.message.text.strip()
+        logger.info(f"✉️ received text: {text}")
 
-    if text.startswith("קניתי"):
-        item_text = text[6:].strip()
-        match = re.match(r'(?:(\d+)\s+)?(.+)', item_text)
+        match = re.match(r'(?:(\d+)\s+)?(.+)', text)
         quantity = int(match.group(1)) if match and match.group(1) else 1
-        item = match.group(2).strip() if match else item_text
+        item = match.group(2).strip() if match else text
 
-        data = sheet.get_all_records()
-        for i, row in enumerate(data, start=2):
-            if row["פריט"] == item:
-                current_qty = int(row["כמות"])
-                if current_qty <= quantity:
-                    sheet.delete_rows(i)
-                else:
-                    sheet.update_cell(i, 2, current_qty - quantity)
-                await update.message.reply_text(f"✅ הוסר {quantity} {item}")
-                return
-        await update.message.reply_text(f"{item} לא נמצא ברשימה")
-    elif text == "רשימה":
-        data = sheet.get_all_records()
-        if not data:
-            await update.message.reply_text("הרשימה ריקה.")
+        if text.startswith("קניתי"):
+            item_text = text[6:].strip()
+            match = re.match(r'(?:(\d+)\s+)?(.+)', item_text)
+            quantity = int(match.group(1)) if match and match.group(1) else 1
+            item = match.group(2).strip() if match else item_text
+
+            data = sheet.get_all_records()
+            for i, row in enumerate(data, start=2):
+                if row["פריט"] == item:
+                    current_qty = int(row["כמות"])
+                    if current_qty <= quantity:
+                        sheet.delete_rows(i)
+                    else:
+                        sheet.update_cell(i, 2, current_qty - quantity)
+                    await update.message.reply_text(f"✅ הוסר {quantity} {item}")
+                    return
+            await update.message.reply_text(f"{item} לא נמצא ברשימה")
+
+        elif text == "רשימה":
+            data = sheet.get_all_records()
+            if not data:
+                await update.message.reply_text("הרשימה ריקה.")
+            else:
+                reply = "\n".join([f'{row["כמות"]} {row["פריט"]}' for row in data])
+                await update.message.reply_text(reply)
+
         else:
-            reply = "\n".join([f'{row["כמות"]} {row["פריט"]}' for row in data])
-            await update.message.reply_text(reply)
-    else:
-        data = sheet.get_all_records()
-        for i, row in enumerate(data, start=2):
-            if row["פריט"] == item:
-                new_qty = int(row["כמות"]) + quantity
-                sheet.update_cell(i, 2, new_qty)
-                await update.message.reply_text(f"עודכן: {new_qty} {item}")
-                return
-        sheet.append_row([item, quantity])
-        await update.message.reply_text(f"✅ התווסף: {quantity} {item}")
+            data = sheet.get_all_records()
+            for i, row in enumerate(data, start=2):
+                if row["פריט"] == item:
+                    new_qty = int(row["כמות"]) + quantity
+                    sheet.update_cell(i, 2, new_qty)
+                    await update.message.reply_text(f"עודכן: {new_qty} {item}")
+                    return
+            sheet.append_row([item, quantity])
+            await update.message.reply_text(f"✅ התווסף: {quantity} {item}")
+    except Exception as e:
+        logger.error(f"❌ Error in handle_message: {e}")
+        await update.message.reply_text("⚠️ שגיאה. נסה שוב מאוחר יותר.")
 
 # Build app
 app_telegram = ApplicationBuilder().token(TOKEN).build()
@@ -80,6 +93,7 @@ def webhook():
 # Set webhook
 async def set_webhook():
     await app_telegram.bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
+    logger.info(f"🔗 Webhook set to {WEBHOOK_URL}/{TOKEN}")
 
 asyncio.run(set_webhook())
 
