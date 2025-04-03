@@ -1,5 +1,5 @@
-python-telegram-bot==20.7
+python-telegram-bot>=13.0
 gspread
 oauth2client
-flask
-gunicorn
+Flask
+asyncio
