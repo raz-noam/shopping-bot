@@ -2,16 +2,16 @@ import os
 import json
 import re
 import gspread
-import threading
-from flask import Flask, request
+import asyncio
 from oauth2client.service_account import ServiceAccountCredentials
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
+from flask import Flask, request
 
-# הגדרת Flask
+# Flask ל־Webhook
 app = Flask(__name__)
 
-# חיבור ל-Google Sheets
+# חיבור לשיטס
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 creds_dict = json.loads(credentials_json)
@@ -19,11 +19,15 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 sheet = client.open("רשימת קניות").sheet1
 
-# טוקן הבוט
+# טוקן
 TOKEN = "7059075374:AAH9KdldlwL5V50LRGmkiJs2dB-NFfPfFw8"
 
-# טיפול בהודעות
+# Webhook
+WEBHOOK_URL = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}"
+
+# פונקציית טיפול בהודעה
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("📥 הודעה התקבלה בטלגרם")
     text = update.message.text.strip()
     match = re.match(r'(?:(\d+)\s+)?(.+)', text)
     quantity = int(match.group(1)) if match.group(1) else 1
@@ -63,26 +67,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sheet.append_row([item, quantity])
         await update.message.reply_text(f"התווסף {quantity} {item} לרשימה.")
 
-# הגדרת אפליקציית טלגרם
+# אפליקציה
 app_telegram = ApplicationBuilder().token(TOKEN).build()
 app_telegram.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-# הגדרת Webhook
-WEBHOOK_URL = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}"
-
+# Route ל־Webhook
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), app_telegram.bot)
     app_telegram.update_queue.put_nowait(update)
     return "OK"
 
-# רישום ה-Webhook אחרי עליית השרת
-import asyncio
-
-async def set_webhook():
-    await app_telegram.bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
-
-asyncio.run(set_webhook())
+# רישום ה־Webhook
+asyncio.get_event_loop().run_until_complete(
+    app_telegram.bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
+)
 
 # הרצת Flask
 if __name__ == "__main__":
