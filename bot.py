@@ -27,6 +27,8 @@ WEBHOOK_URL = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}"
 
 # פונקציית טיפול בהודעה
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("📥 handle_message הופעלה")
+    print(f"📨 התקבלה הודעה: {update.message.text}")
     print("📥 הודעה התקבלה בטלגרם")
     text = update.message.text.strip()
     match = re.match(r'(?:(\d+)\s+)?(.+)', text)
