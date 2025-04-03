@@ -78,9 +78,11 @@ def webhook():
 
 # רישום ה-Webhook אחרי עליית השרת
 import asyncio
-asyncio.get_event_loop().run_until_complete(
-    app_telegram.bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
-)
+
+async def set_webhook():
+    await app_telegram.bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
+
+asyncio.run(set_webhook())
 
 # הרצת Flask
 if __name__ == "__main__":
